@@ -1,5 +1,5 @@
 # GBCartSlurp
-Dumps Gameboy and Gameboy color cartridges with a suitable reader. Code is based on the original Inside Gadgets [GBCartRead](https://github.com/insidegadgets/GBCartRead) for arduino but modified to work with the wiringPi library on the Pi. The hardware consists of a Raspberry Pi and 2 MCP23017 I2C 16 way port expanders. configuration to be documented once the design is finalised
+Dumps Gameboy and Gameboy color cartridges with a suitable reader. Code is based on the original @insidegadgets [GBCartRead](https://github.com/insidegadgets/GBCartRead) for arduino but modified to work with the wiringPi library on the Pi. The hardware consists of a Raspberry Pi and 2 MCP23017 I2C 16 way port expanders. configuration to be documented once the design is finalised
 
 ### Deps:
 [wiringPi](https://projects.drogon.net/raspberry-pi/wiringpi)
