@@ -19,7 +19,7 @@ const int rdPin = 1;
 const int mreqPin = 2;
 const int allHigh = 0x07;
 const int readPins = 0x01;
-const int writePins = 0x05;
+const int writePins = 0x06;
 int addrFD=0;
 int dataFD=0;
 
@@ -102,8 +102,8 @@ void writeGBByte(unsigned short addr, unsigned char data)
 	//split the addr into lower and upper bytes
 	int lower=0;
 	int upper=0;
-	lower = addr & 0x0003;
-	upper = addr >> 2;
+	lower = addr & 0x00ff;
+	upper = addr >> 8;
 	writeMCPByte(addrFD, lower, 0);
 	writeMCPByte(addrFD, upper, 1);
 
@@ -199,14 +199,17 @@ int main(int argc, char* argv[])
 	
 	// Read Cartridge Header
 	char gameTitle[17];
+	char outString[255];
 	unsigned int addr = 0x0134;
 	for (; addr <= 0x0143; addr++) {
 		gameTitle[(addr - 0x0134)] = (char)readGBByte(addr);
 	}
 	gameTitle[16] = '\0';
-
+	sprintf(outString, "game: %s",gameTitle);
+	puts(outString);
+	
 	char gameFile[25];
-	sprintf(gameFile, "%s.gb", gameTitle);
+	sprintf(gameFile, "cart.gb");//, gameTitle);
 	puts(gameFile);
 	
 	FILE* fp = fopen(gameFile, "w+"); //create a new file to write into. overwrite an existing
@@ -222,7 +225,7 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 	fwrite(gameTitle,25,1,logfp);
-	fclose(logfp);
+	//fclose(logfp);
 	//fclose(fp);
 	//return 0;
 
@@ -276,25 +279,33 @@ int main(int argc, char* argv[])
 	//puts(infoString);
 	unsigned char readData[64];
 	// Read x number of banks 
+	int byteCount = romBanks  * 0x4000;
+	printf("%d bytes to read\r\n",byteCount);
+	char buf[6];
 	int y;
 	for (y = 1; y < romBanks; y++) 
 	{
-		printf("------Dumping bank %d of %d\r\n\r\n[", y, romBanks);
+		printf("------Dumping bank %d of %d\r\n\r\n[", y, romBanks -1);
 		//puts(infoString);
 
 		writeGBByte(0x2100, y); // Set ROM bank 
 		if (y > 1) 
 			addr = 0x4000; 
 		//int j;
-		for (int j=1; addr <= 0x7FFF; addr = addr + 64) 
+		for (int j=1; addr <= 0x7FFF; addr += 64) 
 		{
 			memset(readData, 0, 64);
 			int i;
 			for (i = 0; i < 64; i++)
 			{
-				readData[i] = readGBByte((unsigned short)addr + i);
+				unsigned char ch = readGBByte((unsigned short)addr + i);
+				readData[i] = ch;
 				unsigned short tmp = (unsigned short)addr+i;
-				//fwrite(&tmp,2,1,logfp);
+				sprintf(buf,"%05d",tmp);
+				fwrite(buf,5,1,logfp);
+				fwrite(": ",2,1,logfp);
+				sprintf(buf,"%02X\n\r",ch);
+				fwrite(buf,4,1,logfp);
 			}
 			fwrite(readData, 1, 64,fp);
 			printf("#");
@@ -306,7 +317,7 @@ int main(int argc, char* argv[])
 		puts("]");
 	
 	}
-
+	fclose(logfp);
 	fclose(fp);
 	//dump ram if there is one
 	// MBC2 Fix (unknown why this fixes it, maybe has to read ROM before RAM?)
@@ -339,7 +350,7 @@ int main(int argc, char* argv[])
 		int bank;
 		for (bank = 0; bank < ramBanks; bank++) 
 		{
-			sprintf(infoString, "------Dumping bank %d of %d\r\n\r\n[", bank, ramBanks);
+			sprintf(infoString, "------Dumping bank %d of %d\r\n\r\n[", bank, ramBanks -1);
 			puts(infoString);
 
 			writeGBByte(0x4000, bank);
