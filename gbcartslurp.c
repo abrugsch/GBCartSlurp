@@ -444,31 +444,74 @@ int main(int argc, char* argv[])
 		puts("Setup Failed\r\n");
 		return 1;
 	}
-	
-	//mcp23017Setup(AddrBusBase,0x20);
-	//mcp23017Setup(DataBusBase,0x21);
-	setIO();
-	writeMCPByte(dataFD,allHigh,1);
-	//pinWrite(rdPin, HIGH);
-	//pinWrite(wrPin, HIGH);
-	//pinWrite(mreqPin, HIGH);
-	
-#ifdef _TEST
-	
-		test();
-		return 0;
-#endif
-	
-	// Read Cartridge Header
-	readCartInfo();
-	
-	if(DumpRom())
-		return 1;
-	
-	//dump ram if there is one
-	if(DumpRam())
-		return 1;
-
+	//main menu loop
+	int bQuitState=0;
+	while(!bQuitState)
+	{
+		int c;
+		puts("*** Options: ***");
+		puts(" > 1 - Dump whole cartridge and SRAM (if any)");
+		puts(" > 2 - Dump cart only");
+		puts(" > 3 - Dump SRAM only");
+		puts(" > 4 - Show cartridge details");
+		puts(" > 5 - Save SRAM data to cart");
+		puts(" > 6 - Quit");
+		c = getchar();
+		if (c != EOF)
+		{
+			setIO();
+			writeMCPByte(dataFD,allHigh,1);		
+			
+			// Read Cartridge Header
+			readCartInfo();			
+			switch (c)
+			{
+			case '1':
+				if(DumpRom()==1)
+				{
+					bQuitState=1;
+					continue;
+				}
+				if(DumpRam()==1)
+				{
+					bQuitState=1;
+					continue;
+				}
+				break;
+			case '2':
+				if(DumpRom()==1)
+				{
+					bQuitState=1;
+					continue;
+				}				
+				break;
+			case '3':
+				if(DumpRam()==1)
+				{
+					bQuitState=1;
+					continue;
+				}				
+				break;
+			case '5':
+			{
+				char saveFile[100];
+				puts(" Save file:");
+				fgets(saveFile,100,stdin);
+				WriteRam(saveFile);
+			
+				break;
+			}
+			case '6':
+				bQuitState = 1;
+				break;
+			default:
+				puts(" Nope!\r\n\r\n");
+				break;
+			}
+		}		
+		else 
+			bQuitState = 1;
+	}
 
 	puts("Done");
 
