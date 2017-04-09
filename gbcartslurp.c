@@ -17,9 +17,10 @@
 const int wrPin = 0;
 const int rdPin = 1;
 const int mreqPin = 2;
-const int allHigh = 0x07;
-const int readPins = 0x01;
-const int writePins = 0x06;
+const int gbaCS2Pin = 3;
+const int allHigh = 0x0F;
+const int readPins = 0x09;
+const int writePins = 0x0A;
 int addrFD=0;
 int dataFD=0;
 char gameTitle[17];
@@ -28,25 +29,30 @@ int romSize = 0;
 int ramSize = 0;
 int romBanks = 2; // Default 32K
 int ramBanks = 1;
+int iDataOut = 0xFF;
 //only going to touch bank A on the data bus chip
 void changeDataBusMode(int mode)
 {
-	int data;
-	if(mode == OUTPUT)
-		data = 0x00;
-	else
-		data =0xFF;
-	wiringPiI2CWriteReg8(dataFD, MCP23x17_IODIRA, data);
+	if(mode != iDataOut)
+	{
+		int data;
+		if(mode == OUTPUT)
+			data = 0x00;
+		else
+			data =0xFF;
+		wiringPiI2CWriteReg8(dataFD, MCP23x17_IODIRA, data);
+		iDataOut = mode;
+		
+	}
 }
 void writeMCPByte(int fd, int data, int AB)
 {
-	int reg=0;
-	if(AB == 0)
-		reg=MCP23x17_GPIOA;
-	else
-		reg=MCP23x17_GPIOB;
-	wiringPiI2CWriteReg8(fd, reg, data);
+	wiringPiI2CWriteReg8(fd, AB, data);
 	
+}
+void writeMCPWord(int fd, int data)
+{
+	wiringPiI2CWriteReg16(fd, MCP23x17_GPIOA, data);
 }
 unsigned char readMCPByte(int fd, int AB)
 {
@@ -74,66 +80,32 @@ unsigned char readGBByte(unsigned short addr)
 {
 	unsigned char dataByte = 0xfe;
 	//put the address onto the bus
-	//split the addr into lower and upper bytes
-	int lower=0;
-	int upper=0;
-	lower = addr & 0x00ff;
-	upper = addr >> 8;
-	writeMCPByte(addrFD, lower, 0);
-	writeMCPByte(addrFD, upper, 1);
 
+	writeMCPWord(addrFD, (int)addr);
 	//set read mode
-	writeMCPByte(dataFD,readPins,1);
-	//pinWrite(wrPin,HIGH);//0
-	//pinWrite(mreqPin,LOW);//2
-	//pinWrite(rdPin,LOW);//1
-#ifdef _TEST
-	delay(1000);
-#endif	
-	delayMicroseconds(2);
+	writeMCPByte(dataFD,readPins,MCP23x17_GPIOB);
 
+	changeDataBusMode(INPUT);
 	dataByte = (unsigned char)readMCPByte(dataFD,0);
 
 	//set nothing mode
-	//pinWrite(mreqPin,HIGH);//2
-	//pinWrite(rdPin,HIGH);//1
-	writeMCPByte(dataFD,allHigh,1);
+	writeMCPByte(dataFD,allHigh,MCP23x17_GPIOB);
 	return dataByte;
 }
 void writeGBByte(unsigned short addr, unsigned char data)
 {
 	
 	//put the address onto the bus
-	//split the addr into lower and upper bytes
-	int lower=0;
-	int upper=0;
-	lower = addr & 0x00ff;
-	upper = addr >> 8;
-	writeMCPByte(addrFD, lower, 0);
-	writeMCPByte(addrFD, upper, 1);
+	writeMCPWord(addrFD, (int)addr);
 
-
-	//pinWrite(wrPin,HIGH);
-	
 	changeDataBusMode(OUTPUT);
-	writeMCPByte(dataFD,(int)data,0);
+	writeMCPByte(dataFD,(int)data,MCP23x17_GPIOA);
 	
-	//const int wrPin = 0;
-//const int rdPin = 1;
-//const int mreqPin = 2;
-	writeMCPByte(dataFD,writePins,1);
-	//pinWrite(mreqPin,LOW);
-	//pinWrite(wrPin,LOW);
-#ifdef _TEST
-	delay(3000);
-#endif
-	delay(2);
-	writeMCPByte(dataFD,allHigh,1);
-	//pinWrite(mreqPin,HIGH);
-	//pinWrite(wrPin,HIGH);
+	writeMCPByte(dataFD,writePins,MCP23x17_GPIOB);
+	writeMCPByte(dataFD,writePins,MCP23x17_GPIOB);
 
-	changeDataBusMode(INPUT);
-	//return dataByte;
+	writeMCPByte(dataFD,allHigh,MCP23x17_GPIOB);
+
 }
 int mcpSetup(int i2cAddress)
 {
@@ -147,11 +119,11 @@ int mcpSetup(int i2cAddress)
 void setIO()
 {
 	//set as outputs
-	wiringPiI2CWriteReg8 (addrFD, MCP23x17_IODIRA, 0x00);
-	wiringPiI2CWriteReg8 (addrFD, MCP23x17_IODIRB, 0x00);
+	wiringPiI2CWriteReg16 (addrFD, MCP23x17_IODIRA, 0x0000);
+
 	//data bus chip
-	wiringPiI2CWriteReg8 (dataFD, MCP23x17_IODIRA, 0xFF);
-	wiringPiI2CWriteReg8 (dataFD, MCP23x17_IODIRB, 0x00);
+	wiringPiI2CWriteReg16 (dataFD, MCP23x17_IODIRA, 0x00FF);
+
 }
 
 void test()
@@ -224,6 +196,11 @@ void readCartInfo()
 			romBanks = 96;
 	}
 
+	sprintf(outString, "Cart type: %d", cartridgeType);
+	puts(outString);
+	sprintf(outString, "Rom Banks: %d", romBanks);
+	puts(outString);
+	
 	ramBanks = 1; // Default 8K RAM
 	if (ramSize == 3) { ramBanks = 4; }
 	if (ramSize == 4){ ramBanks = 16; } // GB Camera
@@ -239,16 +216,7 @@ int DumpRom()
 		perror("File opening failed");
 		return 1;
 	}
-	//FILE* logfp = fopen("logfile.bin","w+");
-	//if(!logfp)
-	//{
-	//	perror("log opening failed");
-	//	return 1;
-	//}
-	//fwrite(gameTitle,25,1,logfp);
-	//fclose(logfp);
-	//fclose(fp);
-	//return 0;
+
 
 	int addr = 0;
 	//char infoString[100];
@@ -256,7 +224,8 @@ int DumpRom()
 	printf("**********DUMPING ROM %s ************\r\n",gameFile);
 	//dump ROM
 	//puts(infoString);
-	unsigned char readData[64];
+	int bufSiz = 4096;
+	unsigned char readData[bufSiz];
 	// Read x number of banks 
 	int byteCount = romBanks  * 0x4000;
 	printf("%d bytes to read\r\n",byteCount);
@@ -271,24 +240,18 @@ int DumpRom()
 		if (y > 1) 
 			addr = 0x4000; 
 		//int j;
-		for (int j=1; addr <= 0x7FFF; addr += 64) 
+		for (int j=1; addr <= 0x7FFF; addr += bufSiz) 
 		{
-			memset(readData, 0, 64);
+			memset(readData, 0, bufSiz);
 			int i;
-			for (i = 0; i < 64; i++)
+			for (i = 0; i < bufSiz; i++)
 			{
-				unsigned char ch = readGBByte((unsigned short)addr + i);
-				readData[i] = ch;
-				unsigned short tmp = (unsigned short)addr+i;
-				sprintf(buf,"%05d",tmp);
-				//fwrite(buf,5,1,logfp);
-				//fwrite(": ",2,1,logfp);
-				sprintf(buf,"%02X\n\r",ch);
-				//fwrite(buf,4,1,logfp);
+
+				readData[i] = readGBByte((unsigned short)addr + i);
+
 			}
-			fwrite(readData, 1, 64,fp);
-			printf("#");
-			fflush(stdout);
+			fwrite(readData, 1, bufSiz,fp);
+
 			if (j++ % 32 == 0)
 				puts(".");
 	
@@ -316,9 +279,11 @@ int WriteRam(char* FileName)
 	// Does cartridge have RAM
 	if (endaddr > 0) 
 	{
-		//char saveFile[25];
-		//sprintf(saveFile, "%s.sav", gameTitle);
-		//puts(saveFile);
+		if(cartridgeType <= 4)
+		{
+			writeGBByte(0x6000,1);
+		}
+
 		FILE* fp = fopen(FileName, "r"); //create a new file to write into. overwrite an existing
 		if (!fp) 
 		{
@@ -335,12 +300,12 @@ int WriteRam(char* FileName)
 		int bank;
 		for (bank = 0; bank < ramBanks; bank++) 
 		{
-			sprintf(infoString, "------Writing bank %d of %d\r\n\r\n[", bank+1, ramBanks -1);
+			sprintf(infoString, "------Writing bank %d of %d\r\n\r\n[", bank+1, ramBanks);
 			puts(infoString);
 
 			writeGBByte(0x4000, bank);
 
-			// Read RAM
+			// Write to the RAM
 			int j = 1;
 			for (addr = 0xA000; addr <= endaddr; addr = addr + 64) 
 			{
@@ -370,7 +335,8 @@ int DumpRam()
 {
 	// MBC2 Fix (unknown why this fixes it, maybe has to read ROM before RAM?)
 	readGBByte(0x0134);
-	unsigned char readData[64];
+	int bufSiz = 512;
+	unsigned char readData[512];
 	int addr = 0;
 	unsigned int endaddr = 0;
 	if (cartridgeType == 6 && ramSize == 0) 
@@ -401,20 +367,20 @@ int DumpRam()
 		int bank;
 		for (bank = 0; bank < ramBanks; bank++) 
 		{
-			sprintf(infoString, "------Dumping bank %d of %d\r\n\r\n[", bank+1, ramBanks -1);
+			sprintf(infoString, "------Dumping bank %d of %d\r\n\r\n[", bank+1, ramBanks);
 			puts(infoString);
 
 			writeGBByte(0x4000, bank);
 
 			// Read RAM
 			int j = 1;
-			for (addr = 0xA000; addr <= endaddr; addr = addr + 64) 
+			for (addr = 0xA000; addr <= endaddr; addr += bufSiz) 
 			{
 				int i;
-				for (i = 0; i < 64; i++){
+				for (i = 0; i < bufSiz; i++){
 					readData[i] = readGBByte(addr + i);
 				}
-				fwrite(readData, 1, 64, fp);
+				fwrite(readData, 1, bufSiz, fp);
 				printf("#");
 				fflush(stdout);
 				if (j++ % 32 == 0)
@@ -444,6 +410,8 @@ int main(int argc, char* argv[])
 		puts("Setup Failed\r\n");
 		return 1;
 	}
+	//set sequential mode IOCON.SEQOP
+	writeMCPByte(addrFD, 0x20,0x0A);
 	//main menu loop
 	int bQuitState=0;
 	while(!bQuitState)
@@ -460,7 +428,7 @@ int main(int argc, char* argv[])
 		if (c != EOF)
 		{
 			setIO();
-			writeMCPByte(dataFD,allHigh,1);		
+			writeMCPByte(dataFD,allHigh,MCP23x17_GPIOB);		
 			
 			// Read Cartridge Header
 			readCartInfo();			
@@ -497,7 +465,7 @@ int main(int argc, char* argv[])
 				char saveFile[100];
 				puts(" Save file:");
 				fgets(saveFile,100,stdin);
-				WriteRam(saveFile);
+				WriteRam("TETRIS.sav");
 			
 				break;
 			}
