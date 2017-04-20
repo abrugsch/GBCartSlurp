@@ -386,7 +386,7 @@ int DumpRam()
 				if (j++ % 32 == 0)
 					puts(".");
 			}
-			puts("]");
+-			puts("]");
 		}
 		fclose(fp);
 		// Disable RAM
@@ -421,10 +421,10 @@ int main(int argc, char* argv[])
 		puts(" > 1 - Dump whole cartridge and SRAM (if any)");
 		puts(" > 2 - Dump cart only");
 		puts(" > 3 - Dump SRAM only");
-		puts(" > 4 - Show cartridge details");
+		puts(" > 4 - Re-read cartridge details");
 		puts(" > 5 - Save SRAM data to cart");
 		puts(" > 6 - Quit");
-		c = getchar();
+		scanf("%d%*c",&c);
 		if (c != EOF)
 		{
 			setIO();
@@ -434,7 +434,7 @@ int main(int argc, char* argv[])
 			readCartInfo();			
 			switch (c)
 			{
-			case '1':
+			case 1:
 				if(DumpRom()==1)
 				{
 					bQuitState=1;
@@ -446,21 +446,21 @@ int main(int argc, char* argv[])
 					continue;
 				}
 				break;
-			case '2':
+			case 2:
 				if(DumpRom()==1)
 				{
 					bQuitState=1;
 					continue;
 				}				
 				break;
-			case '3':
+			case 3:
 				if(DumpRam()==1)
 				{
 					bQuitState=1;
 					continue;
 				}				
 				break;
-			case '5':
+			case 5:
 			{
 				char saveFile[100];
 				puts(" Save file:");
@@ -469,7 +469,7 @@ int main(int argc, char* argv[])
 			
 				break;
 			}
-			case '6':
+			case 6:
 				bQuitState = 1;
 				break;
 			default:
