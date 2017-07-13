@@ -465,7 +465,7 @@ int main(int argc, char* argv[])
 				char saveFile[100];
 				puts(" Save file:");
 				fgets(saveFile,100,stdin);
-				WriteRam("TETRIS.sav");
+				WriteRam(saveFile);
 			
 				break;
 			}
